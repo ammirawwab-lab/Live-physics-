@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>APEX — Physics & Financial Simulation Suite (Awwab)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+  :root { --accent:#22d3ee; }
+  * { font-family: 'Inter', system-ui, sans-serif; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  body { background: #020617; }
+  .glass { background: rgba(15,23,42,.55); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(148,163,184,.12); }
+  .glass-strong { background: rgba(10,15,30,.72); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(148,163,184,.14); }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.25); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.45); }
+  input[type="range"] { -webkit-appearance: none; appearance: none; height: 5px; border-radius: 999px;
+    background: linear-gradient(90deg, rgba(34,211,238,.9) 0%, rgba(34,211,238,.9) var(--pct,50%), rgba(148,163,184,.18) var(--pct,50%)); outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: #e2e8f0; border: 3px solid #06b6d4; box-shadow: 0 0 10px rgba(34,211,238,.55); cursor: grab; transition: transform .12s; }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+  input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #e2e8f0; border: 3px solid #06b6d4; cursor: grab; }
+  .chip { transition: all .15s ease; }
+  .chip.active { background: rgba(34,211,238,.18) !important; border-color: rgba(34,211,238,.6) !important; color: #a5f3fc !important; box-shadow: 0 0 14px rgba(34,211,238,.25); }
+  .btn-glow:hover { box-shadow: 0 0 22px rgba(34,211,238,.35); }
+  .tab-btn { transition: all .18s ease; }
+  .tab-btn.active { background: linear-gradient(135deg, rgba(34,211,238,.22), rgba(99,102,241,.22)); border-color: rgba(34,211,238,.5); color: #e0f2fe; }
+  .drawer { transition: transform .3s cubic-bezier(.4,0,.2,1); }
+  .drawer.closed { transform: translateY(105%); }
+  canvas { display: block; }
+  .stat-card { transition: transform .15s ease, border-color .15s ease; }
+  .stat-card:hover { transform: translateY(-2px); border-color: rgba(34,211,238,.4); }
+  @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  .live-dot { animation: pulse-dot 1.2s infinite; }
+</style>
+</head>
+<body class="h-screen w-screen overflow-hidden text-slate-200 select-none">
+
+<div class="flex flex-col h-full">
+
+  <header class="glass-strong z-20 flex items-center justify-between px-5 py-3 border-b border-white/10">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/30">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#020617" stroke-width="2.4" stroke-linecap="round"><path d="M4 20 Q 12 2 20 20"/><path d="M4 20h16" opacity=".5"/></svg>
+      </div>
+      <div>
+        <h1 class="text-sm font-extrabold tracking-widest text-white">APEX <span class="text-cyan-400">DYNAMICS</span> <span class="text-[10px] font-semibold text-slate-400 font-normal tracking-normal">(Awwab)</span></h1>
+        <p class="text-[10px] text-slate-400 tracking-wide">3D Physics Engine &amp; Financial Modeling Suite</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="module-badge" class="hidden sm:inline-flex text-[10px] mono px-2.5 py-1 rounded-full border border-cyan-400/30 bg-cyan-400/10 text-cyan-300">MODULE: BALLISTICS</span>
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full glass border-white/10">
+        <span class="w-2 h-2 rounded-full live-dot" id="fps-dot" style="background:#34d399"></span>
+        <span class="mono text-xs text-slate-300"><span id="fps-val" class="text-emerald-400 font-semibold">60</span> FPS</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex flex-1 min-h-0">
+
+    <div class="flex-1 relative min-w-0" id="viewport-wrap">
+      <div id="viewport" class="absolute inset-0"></div>
+
+      <div class="absolute top-4 left-4 glass rounded-xl px-3 py-2 text-[10px] text-slate-400 leading-relaxed pointer-events-none">
+        <div class="text-slate-200 font-semibold tracking-wider mb-1">ORBIT: Drag &nbsp;·&nbsp; ZOOM: Scroll &nbsp;·&nbsp; PAN: Right-Drag</div>
+        <div><span class="text-emerald-400">■</span> Velocity Vector &nbsp; <span class="text-rose-400">■</span> Gravity Vector &nbsp; <span class="text-cyan-400">■</span> Trajectory / Trail</div>
+      </div>
+
+      <div class="absolute top-4 right-4 glass rounded-xl px-3 py-2 text-[10px] mono text-slate-300 pointer-events-none space-y-0.5">
+        <div>GRAVITY <span id="chip-g" class="text-cyan-300 font-semibold">9.81 m/s²</span></div>
+        <div>BODY <span id="chip-body" class="text-cyan-300 font-semibold">EARTH</span></div>
+        <div>STATE <span id="chip-state" class="text-amber-300 font-semibold">IDLE</span></div>
+      </div>
+
+      <div class="absolute bottom-4 left-4 glass rounded-xl p-3 pointer-events-none min-w-[300px]">
+        <div class="text-[10px] tracking-widest text-slate-500 font-semibold mb-2">LIVE TELEMETRY</div>
+        <div class="grid grid-cols-4 gap-3 mono text-xs">
+          <div><div class="text-slate-500 text-[9px]">TIME</div><div class="text-white font-semibold"><span id="hud-t">0.00</span>s</div></div>
+          <div><div class="text-slate-500 text-[9px]">ALTITUDE</div><div class="text-white font-semibold"><span id="hud-y">0.00</span>m</div></div>
+          <div><div class="text-slate-500 text-[9px]">DOWNRANGE</div><div class="text-white font-semibold"><span id="hud-x">0.00</span>m</div></div>
+          <div><div class="text-slate-500 text-[9px]">SPEED</div><div class="text-white font-semibold"><span id="hud-v">0.00</span>m/s</div></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="w-[420px] max-w-full flex flex-col border-l border-white/10 glass-strong min-h-0 relative z-10">
+
+      <div class="flex gap-2 p-3 border-b border-white/5">
+        <button id="tab-physics" class="tab-btn active flex-1 py-2.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-400">⚛ PHYSICS WORKSPACE</button>
+        <button id="tab-finance" class="tab-btn flex-1 py-2.5 rounded-xl text-xs font-semibold border border-white/10 text-slate-400">◈ FINANCIAL ENGINEERING</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto min-h-0">
+
+        <div id="page-physics" class="p-4 space-y-4">
+
+          <section class="glass rounded-2xl p-4 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-[11px] font-bold tracking-widest text-slate-300">LAUNCH PARAMETERS</h3>
+              <span class="text-[9px] mono text-slate-500">m=1kg · ρ=1.225 · A=0.03m²</span>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400">Launch Angle</span><span class="mono text-cyan-300 font-semibold" id="lbl-angle">45°</span></div>
+              <input type="range" id="inp-angle" min="0" max="90" step="0.5" value="45" class="w-full" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400">Initial Velocity</span><span class="mono text-cyan-300 font-semibold" id="lbl-vel">35 m/s</span></div>
+              <input type="range" id="inp-vel" min="1" max="120" step="0.5" value="35" class="w-full" />
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400">Launch Azimuth</span><span class="mono text-cyan-300 font-semibold" id="lbl-az">25°</span></div>
+              <input type="range" id="inp-az" min="0" max="360" step="1" value="25" class="w-full" />
+            </div>
+
+            <div>
+              <div class="text-xs text-slate-400 mb-1.5">Gravity Vector</div>
+              <div class="grid grid-cols-4 gap-1.5 mb-2" id="grav-chips">
+                <button data-g="9.81" data-body="EARTH" class="chip active text-[10px] py-1.5 rounded-lg border border-white/10 bg-white/5 text-slate-300">🌍 9.81</button>
+                <button data-g="1.62" data-body="MOON" class="chip text-[10px] py-1.5 rounded-lg border border-white/10 bg-white/5 text-slate-300">🌙 1.62</button>
+                <button data-g="3.71" data-body="MARS" class="chip text-[10px] py-1.5 rounded-lg border border-white/10 bg-white/5 text-slate-300">🔴 3.71</button>
+                <button data-g="custom" data-body="CUSTOM" class="chip text-[10px] py-1.5 rounded-lg border border-white/10 bg-white/5 text-slate-300">⚙ Custom</button>
+              </div>
+              <div id="custom-g-wrap" class="hidden">
+                <input type="number" id="inp-g" min="0.1" max="60" step="0.01" value="9.81" class="w-full bg-slate-900/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs mono focus:border-cyan-400/60 outline-none" />
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs mb-1.5"><span class="text-slate-400">Drag Coefficient (C<sub>d</sub>)</span><span class="mono text-cyan-300 font-semibold" id="lbl-cd">0.20</span></div>
+              <input type="range" id="inp-cd" min="0" max="2" step="0.01" value="0.2" class="w-full" />
+            </div>
+          </section>
+
+          <section class="flex items-center gap-2">
+            <button id="btn-launch" class="btn-glow flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs font-bold tracking-widest hover:from-cyan-400 hover:to-blue-500 transition-all">▲ LAUNCH</button>
+            <button id="btn-reset" class="py-3 px-4 rounded-xl glass text-xs font-semibold text-slate-300 hover:bg-white/10 transition-all">RESET</button>
+            <select id="inp-speed" class="glass rounded-xl px-2 py-3 text-xs bg-transparent outline-none cursor-pointer">
+              <option value="0.25" class="bg-slate-900">0.25×</option>
+              <option value="0.5" class="bg-slate-900">0.5×</option>
+              <option value="1" selected class="bg-slate-900">1×</option>
+              <option value="2" class="bg-slate-900">2×</option>
+            </select>
+          </section>
+
+          <section class="grid grid-cols-2 gap-2">
+            <div class="stat-card glass rounded-xl p-3">
+              <div class="text-[9px] tracking-widest text-slate-500 font-semibold">MAX HEIGHT H<sub>max</sub></div>
+              <div class="mono text-lg font-bold text-white mt-1"><span id="res-hmax">—</span> <span class="text-[10px] text-slate-400">m</span></div>
+            </div>
+            <div class="stat-card glass rounded-xl p-3">
+              <div class="text-[9px] tracking-widest text-slate-500 font-semibold">FLIGHT TIME t<sub>total</sub></div>
+              <div class="mono text-lg font-bold text-white mt-1"><span id="res-time">—</span> <span class="text-[10px] text-slate-400">s</span></div>
+            </div>
+            <div class="stat-card glass rounded-xl p-3">
+              <div class="text-[9px] tracking-widest text-slate-500 font-semibold">RANGE R</div>
+              <div class="mono text-lg font-bold text-white mt-1"><span id="res-range">—</span> <span class="text-[10px] text-slate-400">m</span></div>
+            </div>
+            <div class="stat-card glass rounded-xl p-3">
+              <div class="text-[9px] tracking-widest text-slate-500 font-semibold">IMPACT VELOCITY</div>
+              <div class="mono text-lg font-bold text-white mt-1"><span id="res-vimp">—</span> <span class="text-[10px] text-slate-400">m/s</span></div>
+            </div>
+          </section>
+        </div>
+
+        <div id="page-finance" class="p-4 space-y-4 hidden">
+
+          <section class="glass rounded-2xl p-4 space-y-4">
+            <h3 class="text-[11px] font-bold tracking-widest text-slate-300">MONTE CARLO ASSET GROWTH <span class="text-slate-500 font-normal">· 100 GBM PATHS · MONTHLY STEPS</span></h3>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-[10px] text-slate-400">Initial Capital ($)</label>
+                <input type="number" id="inp-cap" value="10000" min="1" class="w-full mt-1 bg-slate-900/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs mono focus:border-cyan-400/60 outline-none" />
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-400">Time Horizon (Years)</label>
+                <input type="number" id="inp-years" value="20" min="1" max="60" class="w-full mt-1 bg-slate-900/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs mono focus:border-cyan-400/60 outline-none" />
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-400">Expected Return (%/yr)</label>
+                <input type="number" id="inp-ret" value="8" step="0.1" class="w-full mt-1 bg-slate-900/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs mono focus:border-cyan-400/60 outline-none" />
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-400">Volatility σ (%/yr)</label>
+                <input type="number" id="inp-vol" value="16" step="0.1" min="0" class="w-full mt-1 bg-slate-900/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs mono focus:border-cyan-400/60 outline-none" />
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="btn-mc" class="btn-glow flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-600 text-white text-xs font-bold tracking-widest transition-all hover:from-emerald-400 hover:to-cyan-500">⟳ RUN SIMULATION</button>
+              <span id="mc-seed" class="mono text-[9px] text-slate-500"></span>
+            </div>
+          </section>
+
+          <section class="glass rounded-2xl p-4">
+            <div class="h-[260px] relative"><canvas id="mc-chart"></canvas></div>
+          </section>
+
+          <section class="grid grid-cols-2 gap-2">
+            <div class="stat-card glass rounded-xl p-3"><div class="text-[9px] tracking-widest text-slate-500 font-semibold">MEDIAN OUTCOME</div><div class="mono text-base font-bold text-cyan-300 mt-1" id="stat-median">—</div></div>
+            <div class="stat-card glass rounded-xl p-3"><div class="text-[9px] tracking-widest text-slate-500 font-semibold">MEAN OUTCOME</div><div class="mono text-base font-bold text-white mt-1" id="stat-mean">—</div></div>
+            <div class="stat-card glass rounded-xl p-3"><div class="text-[9px] tracking-widest text-slate-500 font-semibold">P10 / P90</div><div class="mono text-base font-bold text-white mt-1"><span id="stat-p10" class="text-rose-400">—</span> <span class="text-slate-600">/</span> <span id="stat-p90" class="text-emerald-400">—</span></div></div>
+            <div class="stat-card glass rounded-xl p-3"><div class="text-[9px] tracking-widest text-slate-500 font-semibold">P(OUTCOME &gt; CAPITAL)</div><div class="mono text-base font-bold text-emerald-400 mt-1" id="stat-prob">—</div></div>
+          </section>
+
+          <section class="glass rounded-2xl p-4 space-y-3">
+            <h3 class="text-[11px] font-bold tracking-widest text-slate-300">LOAN AMORTIZATION ENGINE</h3>
+            <div class="grid grid-cols-3 gap-2">
+              <div><label class="text-[10px] text-slate-400">Principal ($)</label><input type="number" id="inp-loan" value="300000" min="1" class="w-full mt-1 bg-slate-900/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs mono focus:border-cyan-400/60 outline-none" /></div>
+              <div><label class="text-[10px] text-slate-400">APR (%)</label><input type="number" id="inp-apr" value="6.5" step="0.01" min="0" class="w-full mt-1 bg-slate-900/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs mono focus:border-cyan-400/60 outline-none" /></div>
+              <div><label class="text-[10px] text-slate-400">Term (yr)</label><input type="number" id="inp-term" value="30" min="1" max="50" class="w-full mt-1 bg-slate-900/60 border border-white/10 rounded-lg px-2 py-1.5 text-xs mono focus:border-cyan-400/60 outline-none" /></div>
+            </div>
+            <div class="flex items-center gap-3">
+              <button id="btn-amort" class="py-2 px-4 rounded-xl glass text-xs font-semibold text-slate-300 hover:bg-white/10 transition-all">CALCULATE</button>
+              <div class="h-[90px] w-[90px] shrink-0"><canvas id="amort-chart"></canvas></div>
+              <div class="text-xs space-y-1 min-w-0">
+                <div class="text-slate-500 text-[9px] tracking-widest">MONTHLY PAYMENT</div>
+                <div class="mono font-bold text-white" id="res-pay">—</div>
+                <div class="text-[9px] text-slate-500">Total Interest <span class="mono text-rose-400" id="res-int">—</span></div>
+                <div class="text-[9px] text-slate-500">Total Cost <span class="mono text-slate-200" id="res-tot">—</span></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="border-t border-white/10 p-3 flex gap-2">
+        <button id="btn-export" class="btn-glow flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-bold tracking-widest transition-all hover:from-amber-400 hover:to-orange-500">⇩ EXPORT CSV</button>
+        <button id="btn-history" class="py-2.5 px-4 rounded-xl glass text-xs font-semibold text-slate-300 hover:bg-white/10 transition-all">⏱ HISTORY</button>
+      </footer>
+
+      <div id="drawer" class="drawer closed absolute bottom-0 left-0 right-0 max-h-[70%] flex flex-col glass-strong rounded-t-2xl border-t border-cyan-400/20 z-30">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <h3 class="text-[11px] font-bold tracking-widest text-slate-300">CALCULATION HISTORY <span class="text-slate-500 font-normal">· LAST 10 RUNS</span></h3>
+          <div class="flex gap-2">
+            <button id="btn-clear-hist" class="text-[10px] px-2 py-1 rounded-lg border border-rose-400/30 text-rose-300 hover:bg-rose-500/10 transition-all">CLEAR</button>
+            <button id="btn-close-drawer" class="text-[10px] px-2 py-1 rounded-lg border border-white/15 text-slate-300 hover:bg-white/10 transition-all">✕ CLOSE</button>
+          </div>
+        </div>
+        <div id="history-list" class="overflow-y-auto p-3 space-y-2 flex-1 min-h-0"></div>
+      </div>
+
+    </aside>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+const PHYS_CONST = { MASS: 1.0, RHO: 1.225, AREA: 0.03, DT: 1 / 240, REC_EVERY: 2, MAX_T: 120 };
+
+const state = {
+  physics: { angle: 45, vel: 35, az: 25, g: 9.81, cd: 0.2, body: 'EARTH', custom: false, playSpeed: 1 },
+  finance: { cap: 10000, years: 20, ret: 8, vol: 16, seed: 0 },
+  traj: null,
+  flight: { active: false, t: 0 },
+  history: [],
+  activeTab: 'physics'
+};
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function gaussian(rng) {
+  let u = 0, v = 0;
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+function percentile(sorted, q) {
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos), hi = Math.ceil(pos);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+const moneyCompact = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 });
+const moneyFull = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+/* ─────────────────────────── THREE.JS SCENE ─────────────────────────── */
+
+const viewport = $('viewport');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020617);
+scene.fog = new THREE.Fog(0x020617, 140, 520);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+camera.position.set(18, 14, 26);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+viewport.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI / 2 - 0.02;
+controls.minDistance = 4;
+controls.maxDistance = 320;
+controls.target.set(10, 2, 4);
+
+scene.add(new THREE.HemisphereLight(0x93b4ff, 0x0a0f1e, 0.75));
+const sun = new THREE.DirectionalLight(0xfff4e0, 2.2);
+sun.position.set(45, 80, 30);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -100; sun.shadow.camera.right = 100;
+sun.shadow.camera.top = 120; sun.shadow.camera.bottom = -40;
+sun.shadow.camera.far = 350;
+sun.shadow.bias = -0.0004;
+scene.add(sun);
+
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(500, 64),
+  new THREE.MeshStandardMaterial({ color: 0x0b1220, roughness: 0.95, metalness: 0 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const grid = new THREE.GridHelper(300, 60, 0x155e75, 0x16243d);
+grid.material.transparent = true;
+grid.material.opacity = 0.4;
+scene.add(grid);
+
+{
+  const starGeo = new THREE.BufferGeometry();
+  const starPos = new Float32Array(500 * 3);
+  const rng = mulberry32(7);
+  for (let i = 0; i < 500; i++) {
+    const r = 320 + rng() * 140;
+    const th = rng() * Math.PI * 2;
+    const ph = rng() * Math.PI * 0.48;
+    starPos[i * 3] = r * Math.cos(ph) * Math.cos(th);
+    starPos[i * 3 + 1] = r * Math.sin(ph) + 6;
+    starPos[i * 3 + 2] = r * Math.cos(ph) * Math.sin(th);
+  }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x64748b, size: 0.9, sizeAttenuation: true, transparent: true, opacity: 0.8, fog: false })));
+}
+
+const padGroup = new THREE.Group();
+const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.35, 0.28, 24), new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.7 }));
+pad.position.y = 0.14;
+pad.castShadow = true; pad.receiveShadow = true;
+const padRing = new THREE.Mesh(new THREE.RingGeometry(1.3, 1.6, 32), new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+padRing.rotation.x = -Math.PI / 2;
+padRing.position.y = 0.02;
+padGroup.add(pad, padRing);
+const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.2, 2.6, 12), new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3, metalness: 0.8 }));
+barrel.castShadow = true;
+const barrelPivot = new THREE.Group();
+barrel.position.y = 1.3;
+barrelPivot.add(barrel);
+barrelPivot.position.set(0, 0.3, 0);
+padGroup.add(barrelPivot);
+scene.add(padGroup);
+
+const projectile = new THREE.Mesh(
+  new THREE.SphereGeometry(0.45, 28, 28),
+  new THREE.MeshStandardMaterial({ color: 0x67e8f9, emissive: 0x0891b2, emissiveIntensity: 0.7, roughness: 0.25, metalness: 0.45 })
+);
+projectile.castShadow = true;
+scene.add(projectile);
+
+const MAX_TRAIL = 3000;
+const trailGeo = new THREE.BufferGeometry();
+trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAX_TRAIL * 3), 3));
+trailGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(MAX_TRAIL * 3), 3));
+const trailPts = new THREE.Points(trailGeo, new THREE.PointsMaterial({ size: 0.34, vertexColors: true, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true }));
+trailPts.frustumCulled = false;
+scene.add(trailPts);
+
+const particles = [];
+
+const velArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 4, 0x34d399, 0.9, 0.45);
+const gravArrow = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(), 6, 0xfb7185, 0.9, 0.45);
+scene.add(velArrow, gravArrow);
+
+const impactRing = new THREE.Mesh(new THREE.RingGeometry(0.2, 1.0, 32), new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0, side: THREE.DoubleSide }));
+impactRing.rotation.x = -Math.PI / 2;
+impactRing.position.y = 0.03;
+scene.add(impactRing);
+let impactFx = 0;
+
+const pathLine = (() => {
+  const geo = new THREE.BufferGeometry();
+  const maxPts = Math.ceil(PHYS_CONST.MAX_T / PHYS_CONST.DT / PHYS_CONST.REC_EVERY) + 2;
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(maxPts * 3), 3));
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.55 }));
+  line.frustumCulled = false;
+  scene.add(line);
+  return { mesh: line, geo, maxPts };
+})();
+
+function emitParticle(pos, vel, life, color) {
+  if (particles.length >= MAX_TRAIL) particles.shift();
+  particles.push({ x: pos.x, y: pos.y, z: pos.z, vx: vel.x, vy: vel.y, vz: vel.z, life, max: life, r: color.r, g: color.g, b: color.b, drag: vel.lengthSq() > 0.01 });
+}
+function updateParticles(dtReal) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dtReal * 1.4;
+    if (p.life <= 0 || p.y < 0) { particles.splice(i, 1); continue; }
+    if (p.drag) {
+      p.x += p.vx * dtReal; p.y += p.vy * dtReal; p.z += p.vz * dtReal;
+      p.vy -= state.physics.g * 0.6 * dtReal;
+      p.vx *= 0.985; p.vz *= 0.985;
+    }
+  }
+  const posAttr = trailGeo.attributes.position, colAttr = trailGeo.attributes.color;
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i], f = Math.max(0, p.life / p.max);
+    posAttr.array[i * 3] = p.x; posAttr.array[i * 3 + 1] = p.y; posAttr.array[i * 3 + 2] = p.z;
+    colAttr.array[i * 3] = p.r * f; colAttr.array[i * 3 + 1] = p.g * f; colAttr.array[i * 3 + 2] = p.b * f;
+  }
+  trailGeo.setDrawRange(0, particles.length);
+  posAttr.needsUpdate = true; colAttr.needsUpdate = true;
+}
+
+/* ─────────────────────────── PHYSICS ENGINE ─────────────────────────── */
+
+function launchDir(p) {
+  const th = THREE.MathUtils.degToRad(p.angle), az = THREE.MathUtils.degToRad(p.az);
+  return new THREE.Vector3(Math.cos(th) * Math.cos(az), Math.sin(th), Math.cos(th) * Math.sin(az));
+}
+
+function computeTrajectory(p) {
+  const dt = PHYS_CONST.DT;
+  const k = 0.5 * PHYS_CONST.RHO * p.cd * PHYS_CONST.AREA / PHYS_CONST.MASS;
+  const dir = launchDir(p);
+  let x = 0, y = 0.6, z = 0;
+  let vx = dir.x * p.vel, vy = dir.y * p.vel, vz = dir.z * p.vel;
+  const pts = [];
+  let t = 0, hMax = y, step = 0;
+  const accel = (cx, cy, cz) => {
+    const sp = Math.sqrt(cx * cx + cy * cy + cz * cz);
+    return { ax: -k * sp * cx, ay: -p.g - k * sp * cy, az: -k * sp * cz };
+  };
+  pts.push({ t, x, y, z, vx, vy, vz, s: p.vel });
+  while (t < PHYS_CONST.MAX_T) {
+    const a1 = accel(vx, vy, vz);
+    const mvx = vx + a1.ax * dt / 2, mvy = vy + a1.ay * dt / 2, mvz = vz + a1.az * dt / 2;
+    const a2 = accel(mvx, mvy, mvz);
+    vx += a2.ax * dt; vy += a2.ay * dt; vz += a2.az * dt;
+    x += mvx * dt + a2.ax * dt * dt / 4;
+    y += mvy * dt + a2.ay * dt * dt / 4;
+    z += mvz * dt + a2.az * dt * dt / 4;
+    t += dt;
+    if (y > hMax) hMax = y;
+    step++;
+    if (y <= 0 && vy < 0) {
+      const prev = pts[pts.length - 1];
+      const f = prev.y / (prev.y - y);
+      const ix = prev.x + (x - prev.x) * f, iz = prev.z + (z - prev.z) * f;
+      const it = prev.t + (t - prev.t) * f;
+      const ivx = prev.vx + (vx - prev.vx) * f, ivy = prev.vy + (vy - prev.vy) * f, ivz = prev.vz + (vz - prev.vz) * f;
+      pts.push({ t: it, x: ix, y: 0, z: iz, vx: ivx, vy: ivy, vz: ivz, s: Math.sqrt(ivx * ivx + ivy * ivy + ivz * ivz) });
+      const range = Math.sqrt(ix * ix + iz * iz);
+      return { pts, tTotal: it, hMax, range, vImpact: pts[pts.length - 1].s, impact: new THREE.Vector3(ix, 0, iz), dir };
+    }
+    if (step % PHYS_CONST.REC_EVERY === 0) {
+      pts.push({ t, x, y, z, vx, vy, vz, s: Math.sqrt(vx * vx + vy * vy + vz * vz) });
+    }
+  }
+  return { pts, tTotal: t, hMax, range: Math.sqrt(x * x + z * z), vImpact: Math.sqrt(vx * vx + vy * vy + vz * vz), impact: new THREE.Vector3(x, Math.max(0, y), z), dir };
+}
+
+function sampleTraj(traj, t) {
+  const pts = traj.pts;
+  if (t <= pts[0].t) return pts[0];
+  if (t >= pts[pts.length - 1].t) return pts[pts.length - 1];
+  let lo = 0, hi = pts.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (pts[mid].t <= t) lo = mid; else hi = mid;
+  }
+  const a = pts[lo], b = pts[hi];
+  const f = (t - a.t) / (b.t - a.t || 1e-9);
+  return {
+    t, x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, z: a.z + (b.z - a.z) * f,
+    vx: a.vx + (b.vx - a.vx) * f, vy: a.vy + (b.vy - a.vy) * f, vz: a.vz + (b.vz - a.vz) * f,
+    s: a.s + (b.s - a.s) * f
+  };
+}
+
+function fillPathGeometry(traj) {
+  const posAttr = pathLine.geo.attributes.position;
+  const n = Math.min(traj.pts.length, pathLine.maxPts);
+  for (let i = 0; i < n; i++) {
+    posAttr.array[i * 3] = traj.pts[i].x;
+    posAttr.array[i * 3 + 1] = traj.pts[i].y;
+    posAttr.array[i * 3 + 2] = traj.pts[i].z;
+  }
+  pathLine.geo.setDrawRange(0, n);
+  posAttr.needsUpdate = true;
+}
+
+let camTween = null;
+function fitCamera(traj) {
+  const dist = clamp(Math.max(traj.range * 1.0, traj.hMax * 1.6, 12) * 0.95, 16, 220);
+  const target = new THREE.Vector3(traj.impact.x * 0.5, Math.max(2, traj.hMax * 0.42), traj.impact.z * 0.5);
+  const flat = new THREE.Vector3(traj.impact.x, 0, traj.impact.z);
+  if (flat.lengthSq() < 0.01) flat.set(Math.cos(THREE.MathUtils.degToRad(state.physics.az)), 0, Math.sin(THREE.MathUtils.degToRad(state.physics.az)));
+  flat.normalize();
+  const perp = new THREE.Vector3(-flat.z, 0, flat.x);
+  const pos = target.clone().add(perp.multiplyScalar(dist * 0.85)).add(new THREE.Vector3(0, dist * 0.5, 0));
+  camTween = { t0: 0, dur: 1.1, fromP: camera.position.clone(), toP: pos, fromT: controls.target.clone(), toT: target };
+}
+
+function updateResultsUI(traj) {
+  $('res-hmax').textContent = traj.hMax.toFixed(2);
+  $('res-time').textContent = traj.tTotal.toFixed(2);
+  $('res-range').textContent = traj.range.toFixed(2);
+  $('res-vimp').textContent = traj.vImpact.toFixed(2);
+}
+
+function launch() {
+  const p = state.physics;
+  const traj = computeTrajectory(p);
+  state.traj = traj;
+  state.flight = { active: true, t: 0 };
+  particles.length = 0;
+  fillPathGeometry(traj);
+  updateResultsUI(traj);
+  fitCamera(traj);
+  impactFx = 0;
+  impactRing.material.opacity = 0;
+  $('chip-state').textContent = 'IN FLIGHT';
+  $('chip-state').className = 'text-emerald-300 font-semibold';
+  pushHistory({ type: 'physics', label: `${p.vel} m/s @ ${p.angle}° · ${p.body}`, params: { angle: p.angle, vel: p.vel, g: p.g, cd: p.cd, az: p.az, body: p.body }, results: { hMax: traj.hMax, tTotal: traj.tTotal, range: traj.range, vImpact: traj.vImpact } });
+}
+
+function previewTraj() {
+  const traj = computeTrajectory(state.physics);
+  state.traj = traj;
+  state.flight = { active: false, t: 0 };
+  fillPathGeometry(traj);
+  updateResultsUI(traj);
+}
+
+function resetView() {
+  state.flight = { active: false, t: 0 };
+  particles.length = 0;
+  impactFx = 0;
+  impactRing.material.opacity = 0;
+  previewTraj();
+  camTween = { t0: 0, dur: 0.8, fromP: camera.position.clone(), toP: new THREE.Vector3(18, 14, 26), fromT: controls.target.clone(), toT: new THREE.Vector3(10, 2, 4) };
+  $('chip-state').textContent = 'IDLE';
+  $('chip-state').className = 'text-amber-300 font-semibold';
+}
+
+/* ─────────────────────────── FINANCIAL ENGINE ─────────────────────────── */
+
+let mcChart = null, amortChart = null;
+let mcResult = null;
+
+function runMonteCarlo(seed) {
+  const f = state.finance;
+  const rng = mulberry32(seed);
+  const months = Math.round(clamp(f.years, 1, 60) * 12);
+  const n = 100;
+  const mu = f.ret / 100, sigma = Math.max(0, f.vol / 100), dt = 1 / 12;
+  const drift = (mu - 0.5 * sigma * sigma) * dt;
+  const shocks = sigma * Math.sqrt(dt);
+  const paths = Array.from({ length: n }, () => new Float64Array(months + 1));
+  for (let i = 0; i < n; i++) {
+    let s = f.cap;
+    paths[i][0] = s;
+    for (let m = 1; m <= months; m++) {
+      s *= Math.exp(drift + shocks * gaussian(rng));
+      paths[i][m] = s;
+    }
+  }
+  const len = months + 1;
+  const yearsArr = new Float64Array(len), p10 = new Float64Array(len), p50 = new Float64Array(len), p90 = new Float64Array(len);
+  const buf = new Float64Array(n);
+  for (let m = 0; m < len; m++) {
+    for (let i = 0; i < n; i++) buf[i] = paths[i][m];
+    buf.sort();
+    yearsArr[m] = m / 12;
+    p10[m] = percentile(buf, 0.10);
+    p50[m] = percentile(buf, 0.50);
+    p90[m] = percentile(buf, 0.90);
+  }
+  let sum = 0, beat = 0;
+  for (let i = 0; i < n; i++) { sum += paths[i][months]; if (paths[i][months] > f.cap) beat++; }
+  const stats = { mean: sum / n, median: p50[months], p10: p10[months], p90: p90[months], prob: beat / n };
+  return { paths, yearsArr, p10, p50, p90, stats, months: len, seed, cap: f.cap };
+}
+
+function renderMcChart(res) {
+  const mkData = (arr) => Array.from(arr, (v, i) => ({ x: res.yearsArr[i], y: v }));
+  const base = {
+    points: 0, borderWidth: 1.6, tension: 0.15, fill: false, pointRadius: 0
+  };
+  const config = {
+    type: 'line',
+    data: {
+      datasets: [
+        { label: 'P10 Pessimistic', data: mkData(res.p10), borderColor: '#fb7185', ...base },
+        { label: 'P50 Median', data: mkData(res.p50), borderColor: '#22d3ee', ...base },
+        { label: 'P90 Optimistic', data: mkData(res.p90), borderColor: '#34d399', ...base,
+          fill: { target: 0, above: 'rgba(52,211,153,0.08)', below: 'rgba(52,211,153,0.08)' } }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 450 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#94a3b8', boxWidth: 22, boxHeight: 2, font: { size: 10 } } },
+        tooltip: {
+          backgroundColor: 'rgba(2,6,23,0.92)', borderColor: 'rgba(34,211,238,0.3)', borderWidth: 1,
+          titleColor: '#e2e8f0', bodyColor: '#cbd5e1', padding: 10,
+          callbacks: {
+            title: (items) => `Year ${(+items[0].parsed.x).toFixed(1)}`,
+            label: (item) => ` ${item.dataset.label}: ${moneyFull.format(item.parsed.y)}`
+          }
+        },
+        filler: { propagate: true }
+      },
+      scales: {
+        x: { type: 'linear', min: 0, grid: { color: 'rgba(148,163,184,0.06)' }, ticks: { color: '#64748b', font: { size: 9 }, callback: v => `${v}y`, maxTicksLimit: 12 }, title: { display: true, text: 'Years', color: '#475569', font: { size: 9 } } },
+        y: { grid: { color: 'rgba(148,163,184,0.08)' }, ticks: { color: '#64748b', font: { size: 9 }, callback: v => moneyCompact.format(v) }, title: { display: true, text: 'Portfolio Value', color: '#475569', font: { size: 9 } } }
+      }
+    }
+  };
+  if (mcChart) { mcChart.destroy(); mcChart = null; }
+  mcChart = new Chart($('mc-chart'), config);
+}
+
+function runMc(seedOverride) {
+  const seed = seedOverride ?? Math.floor(Math.random() * 0xFFFFFFFF);
+  state.finance.seed = seed;
+  $('mc-seed').textContent = `seed:${seed.toString(16).toUpperCase()}`;
+  mcResult = runMonteCarlo(seed);
+  renderMcChart(mcResult);
+  $('stat-median').textContent = moneyCompact.format(mcResult.stats.median);
+  $('stat-mean').textContent = moneyCompact.format(mcResult.stats.mean);
+  $('stat-p10').textContent = moneyCompact.format(mcResult.stats.p10);
+  $('stat-p90').textContent = moneyCompact.format(mcResult.stats.p90);
+  $('stat-prob').textContent = `${(mcResult.stats.prob * 100).toFixed(0)}%`;
+  pushHistory({ type: 'finance', mode: 'montecarlo', label: `${moneyCompact.format(state.finance.cap)} · ${state.finance.ret}% ±${state.finance.vol}% · ${state.finance.years}yr`, params: { cap: state.finance.cap, ret: state.finance.ret, vol: state.finance.vol, years: state.finance.years }, seed, results: mcResult.stats });
+}
+
+function runAmortization() {
+  const P = Math.max(1, parseFloat($('inp-loan').value) || 0);
+  const apr = Math.max(0, parseFloat($('inp-apr').value) || 0);
+  const years = clamp(Math.round(parseFloat($('inp-term').value) || 30), 1, 50);
+  const n = years * 12, r = apr / 100 / 12;
+  const M = r === 0 ? P / n : P * r / (1 - Math.pow(1 + r, -n));
+  const total = M * n, interest = total - P;
+  $('res-pay').textContent = moneyFull.format(M);
+  $('res-int').textContent = moneyFull.format(interest);
+  $('res-tot').textContent = moneyFull.format(total);
+  const cfg = {
+    type: 'doughnut',
+    data: { labels: ['Principal', 'Interest'], datasets: [{ data: [P, interest], backgroundColor: ['#0891b2', '#fb7185'], borderWidth: 0, hoverOffset: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '68%', animation: { duration: 400 }, plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(2,6,23,0.92)', callbacks: { label: (c) => ` ${c.label}: ${moneyFull.format(c.parsed)}` } } } }
+  };
+  if (amortChart) amortChart.destroy();
+  amortChart = new Chart($('amort-chart'), cfg);
+  pushHistory({ type: 'finance', mode: 'amortization', label: `Loan ${moneyCompact.format(P)} @ ${apr}% / ${years}yr`, params: { loan: P, apr, term: years }, results: { payment: M, interest, total } });
+}
+
+/* ─────────────────────────── CSV EXPORT ─────────────────────────── */
+
+function downloadCSV(filename, rows) {
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function exportPhysics() {
+  if (!state.traj) { previewTraj(); }
+  const pts = state.traj.pts;
+  const stride = Math.max(1, Math.floor(pts.length / 2000));
+  const rows = [['time_s', 'x_m', 'y_m', 'z_m', 'vx_ms', 'vy_ms', 'vz_ms', 'speed_ms']];
+  for (let i = 0; i < pts.length; i += stride) {
+    const p = pts[i];
+    rows.push([p.t.toFixed(4), p.x.toFixed(4), p.y.toFixed(4), p.z.toFixed(4), p.vx.toFixed(4), p.vy.toFixed(4), p.vz.toFixed(4), p.s.toFixed(4)]);
+  }
+  const l = pts[pts.length - 1];
+  if ((pts.length - 1) % stride !== 0) rows.push([l.t.toFixed(4), l.x.toFixed(4), l.y.toFixed(4), l.z.toFixed(4), l.vx.toFixed(4), l.vy.toFixed(4), l.vz.toFixed(4), l.s.toFixed(4)]);
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  downloadCSV(`apex-trajectory-${stamp}.csv`, rows);
+}
+
+function exportFinance() {
+  if (!mcResult) runMc();
+  const res = mcResult;
+  const header = ['year', ...Array.from({ length: res.paths.length }, (_, i) => `path_${i + 1}`), 'p10', 'p50', 'p90'];
+  const rows = [header];
+  for (let m = 0; m < res.months; m++) {
+    const row = [(m / 12).toFixed(2)];
+    for (let i = 0; i < res.paths.length; i++) row.push(res.paths[i][m].toFixed(2));
+    row.push(res.p10[m].toFixed(2), res.p50[m].toFixed(2), res.p90[m].toFixed(2));
+    rows.push(row);
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  downloadCSV(`apex-montecarlo-seed${res.seed.toString(16)}-${stamp}.csv`, rows);
+}
+
+/* ─────────────────────────── HISTORY SYSTEM ─────────────────────────── */
+
+const HIST_KEY = 'apex-suite-history-v1';
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HIST_KEY);
+    if (raw) state.history = JSON.parse(raw).slice(0, 10);
+  } catch (e) { state.history = []; }
+}
+function saveHistory() {
+  try { localStorage.setItem(HIST_KEY, JSON.stringify(state.history)); } catch (e) { /* storage unavailable */ }
+}
+function pushHistory(entry) {
+  entry.id = Date.now() + Math.floor(Math.random() * 1000);
+  entry.ts = Date.now();
+  state.history.unshift(entry);
+  if (state.history.length > 10) state.history.length = 10;
+  saveHistory();
+  renderHistory();
+}
+function recallEntry(e) {
+  if (e.type === 'physics') {
+    const p = e.params;
+    state.physics.angle = p.angle; state.physics.vel = p.vel; state.physics.az = p.az ?? 25;
+    state.physics.g = p.g; state.physics.cd = p.cd; state.physics.body = p.body;
+    syncPhysicsUI();
+    switchTab('physics');
+    launch();
+  } else if (e.mode === 'montecarlo') {
+    const p = e.params;
+    $('inp-cap').value = p.cap; $('inp-ret').value = p.ret; $('inp-vol').value = p.vol; $('inp-years').value = p.years;
+    state.finance = { ...state.finance, cap: p.cap, ret: p.ret, vol: p.vol, years: p.years };
+    switchTab('finance');
+    runMc(e.seed);
+  } else {
+    const p = e.params;
+    $('inp-loan').value = p.loan; $('inp-apr').value = p.apr; $('inp-term').value = p.term;
+    switchTab('finance');
+    runAmortization();
+  }
+  $('drawer').classList.add('closed');
+}
+function renderHistory() {
+  const list = $('history-list');
+  if (!state.history.length) {
+    list.innerHTML = '<div class="text-center text-slate-500 text-xs py-8">No simulation runs recorded yet.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  for (const e of state.history) {
+    const el = document.createElement('div');
+    el.className = 'glass rounded-xl p-3 flex items-center gap-3';
+    const icon = e.type === 'physics' ? '⚛' : (e.mode === 'amortization' ? '◉' : '◈');
+    const tint = e.type === 'physics' ? 'text-cyan-300 border-cyan-400/30' : 'text-emerald-300 border-emerald-400/30';
+    let detail = '';
+    if (e.type === 'physics') detail = `H ${e.results.hMax.toFixed(1)}m · R ${e.results.range.toFixed(1)}m · t ${e.results.tTotal.toFixed(2)}s`;
+    else if (e.mode === 'montecarlo') detail = `Med ${moneyCompact.format(e.results.median)} · P10 ${moneyCompact.format(e.results.p10)} · P90 ${moneyCompact.format(e.results.p90)}`;
+    else detail = `Pay ${moneyFull.format(e.results.payment)} /mo · Int ${moneyCompact.format(e.results.interest)}`;
+    el.innerHTML = `
+      <div class="w-8 h-8 shrink-0 rounded-lg border ${tint} bg-white/5 flex items-center justify-center text-sm">${icon}</div>
+      <div class="flex-1 min-w-0">
+        <div class="text-xs font-semibold text-slate-200 truncate">${e.label}</div>
+        <div class="text-[10px] mono text-slate-500 truncate">${detail}</div>
+      </div>
+      <div class="text-right shrink-0">
+        <div class="text-[9px] text-slate-500 mb-1">${new Date(e.ts).toLocaleTimeString()}</div>
+        <button class="text-[10px] px-2.5 py-1 rounded-lg border border-cyan-400/40 text-cyan-300 hover:bg-cyan-400/10 transition-all font-semibold">RECALL</button>
+      </div>`;
+    el.querySelector('button').addEventListener('click', () => recallEntry(e));
+    list.appendChild(el);
+  }
+}
+
+/* ─────────────────────────── UI BINDINGS ─────────────────────────── */
+
+function paintRange(input) {
+  const pct = ((input.value - input.min) / (input.max - input.min)) * 100;
+  input.style.setProperty('--pct', pct + '%');
+}
+function bindRange(id, labelId, suffix, cb) {
+  const el = $(id);
+  paintRange(el);
+  el.addEventListener('input', () => {
+    paintRange(el);
+    $(labelId).textContent = (+el.value) + suffix;
+    cb(parseFloat(el.value));
+  });
+}
+
+function syncPhysicsUI() {
+  const p = state.physics;
+  $('inp-angle').value = p.angle; $('lbl-angle').textContent = p.angle + '°'; paintRange($('inp-angle'));
+  $('inp-vel').value = p.vel; $('lbl-vel').textContent = p.vel + ' m/s'; paintRange($('inp-vel'));
+  $('inp-az').value = p.az; $('lbl-az').textContent = p.az + '°'; paintRange($('inp-az'));
+  $('inp-cd').value = p.cd; $('lbl-cd').textContent = p.cd.toFixed(2); paintRange($('inp-cd'));
+  $('inp-g').value = p.g;
+  updateGravityChips();
+}
+function updateGravityChips() {
+  const isCustom = state.physics.custom;
+  const g = state.physics.g;
+  document.querySelectorAll('#grav-chips .chip').forEach(c => {
+    const cg = c.dataset.g;
+    if (cg === 'custom') c.classList.toggle('active', isCustom);
+    else c.classList.toggle('active', !isCustom && Math.abs(parseFloat(cg) - g) < 0.005);
+  });
+  $('custom-g-wrap').classList.toggle('hidden', !isCustom);
+  $('chip-g').textContent = g.toFixed(2) + ' m/s²';
+  $('chip-body').textContent = state.physics.body;
+}
+
+bindRange('inp-angle', 'lbl-angle', '°', v => { state.physics.angle = v; if (!state.flight.active) previewTraj(); syncBarrel(); });
+bindRange('inp-vel', 'lbl-vel', ' m/s', v => { state.physics.vel = v; if (!state.flight.active) previewTraj(); });
+bindRange('inp-az', 'lbl-az', '°', v => { state.physics.az = v; if (!state.flight.active) previewTraj(); syncBarrel(); });
+bindRange('inp-cd', 'lbl-cd', '', v => {
+  state.physics.cd = v; $('lbl-cd').textContent = v.toFixed(2);
+  if (!state.flight.active) previewTraj();
+});
+
+document.querySelectorAll('#grav-chips .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    if (chip.dataset.g === 'custom') {
+      state.physics.custom = true;
+      state.physics.body = 'CUSTOM';
+    } else {
+      state.physics.custom = false;
+      state.physics.g = parseFloat(chip.dataset.g);
+      state.physics.body = chip.dataset.body;
+    }
+    updateGravityChips();
+    if (!state.flight.active) previewTraj();
+  });
+});
+$('inp-g').addEventListener('input', () => {
+  const v = clamp(parseFloat($('inp-g').value) || 9.81, 0.1, 60);
+  state.physics.g = v;
+  updateGravityChips();
+  if (!state.flight.active) previewTraj();
+});
+
+$('inp-speed').addEventListener('change', () => { state.physics.playSpeed = parseFloat($('inp-speed').value); });
+$('btn-launch').addEventListener('click', launch);
+$('btn-reset').addEventListener('click', resetView);
+
+$('btn-mc').addEventListener('click', () => {
+  state.finance.cap = Math.max(1, parseFloat($('inp-cap').value) || 10000);
+  state.finance.ret = parseFloat($('inp-ret').value) || 0;
+  state.finance.vol = Math.max(0, parseFloat($('inp-vol').value) || 0);
+  state.finance.years = clamp(parseFloat($('inp-years').value) || 20, 1, 60);
+  runMc();
+});
+$('btn-amort').addEventListener('click', runAmortization);
+
+function switchTab(tab) {
+  state.activeTab = tab;
+  $('tab-physics').classList.toggle('active', tab === 'physics');
+  $('tab-finance').classList.toggle('active', tab === 'finance');
+  $('page-physics').classList.toggle('hidden', tab !== 'physics');
+  $('page-finance').classList.toggle('hidden', tab !== 'finance');
+  $('module-badge').textContent = tab === 'physics' ? 'MODULE: BALLISTICS' : 'MODULE: FINANCIAL';
+  $('btn-export').innerHTML = tab === 'physics' ? '⇩ EXPORT TRAJECTORY CSV' : '⇩ EXPORT SIMULATION CSV';
+  if (tab === 'finance') {
+    setTimeout(() => {
+      if (mcChart) mcChart.resize();
+      if (amortChart) amortChart.resize();
+    }, 30);
+  }
+}
+$('tab-physics').addEventListener('click', () => switchTab('physics'));
+$('tab-finance').addEventListener('click', () => switchTab('finance'));
+
+$('btn-export').addEventListener('click', () => state.activeTab === 'physics' ? exportPhysics() : exportFinance());
+$('btn-history').addEventListener('click', () => $('drawer').classList.toggle('closed'));
+$('btn-close-drawer').addEventListener('click', () => $('drawer').classList.add('closed'));
+$('btn-clear-hist').addEventListener('click', () => { state.history = []; saveHistory(); renderHistory(); });
+
+function syncBarrel() {
+  const dir = launchDir(state.physics);
+  barrelPivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+}
+
+/* ─────────────────────────── RESIZE & FPS ─────────────────────────── */
+
+function resizeRenderer() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  if (w === 0 || h === 0) return;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resizeRenderer).observe(viewport);
+window.addEventListener('resize', resizeRenderer);
+
+let frames = 0, fpsAcc = 0;
+function updateFPS(dt) {
+  frames++; fpsAcc += dt;
+  if (fpsAcc >= 0.5) {
+    const fps = Math.round(frames / fpsAcc);
+    $('fps-val').textContent = fps;
+    const color = fps >= 48 ? '#34d399' : fps >= 28 ? '#fbbf24' : '#fb7185';
+    $('fps-val').style.color = color;
+    $('fps-dot').style.background = color;
+    frames = 0; fpsAcc = 0;
+  }
+}
+
+/* ─────────────────────────── RENDER LOOP ─────────────────────────── */
+
+const clock = new THREE.Clock();
+const _dir = new THREE.Vector3();
+const _origin = new THREE.Vector3();
+const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dtReal = Math.min(clock.getDelta(), 0.05);
+  const p = state.physics;
+
+  if (camTween) {
+    camTween.t0 += dtReal;
+    const f = clamp(camTween.t0 / camTween.dur, 0, 1);
+    const e = easeInOut(f);
+    camera.position.lerpVectors(camTween.fromP, camTween.toP, e);
+    controls.target.lerpVectors(camTween.fromT, camTween.toT, e);
+    if (f >= 1) camTween = null;
+  }
+
+  let shown = null;
+  if (state.flight.active && state.traj) {
+    state.flight.t += dtReal * p.playSpeed;
+    const traj = state.traj;
+    if (state.flight.t >= traj.tTotal) {
+      state.flight.t = traj.tTotal;
+      state.flight.active = false;
+      $('chip-state').textContent = 'IMPACT';
+      $('chip-state').className = 'text-amber-300 font-semibold';
+      impactFx = 1;
+      impactRing.position.set(traj.impact.x, 0.03, traj.impact.z);
+      const burstN = 70;
+      for (let i = 0; i < burstN; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const up = 0.6 + Math.random() * 1.6;
+        const rad = 0.5 + Math.random() * 2.2;
+        emitParticle(traj.impact, new THREE.Vector3(Math.cos(a) * rad, up * 4, Math.sin(a) * rad), 1.2 + Math.random(), new THREE.Color(0.98, 0.72, 0.25));
+      }
+    }
+    shown = sampleTraj(traj, state.flight.t);
+    projectile.position.set(shown.x, shown.y, shown.z);
+
+    const emitCount = Math.min(6, Math.max(1, Math.round(dtReal * p.playSpeed * 260)));
+    for (let i = 0; i < emitCount; i++) {
+      const jitter = new THREE.Vector3((Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35);
+      const drift = _dir.set(shown.vx, shown.vy, shown.vz).multiplyScalar(-0.018);
+      emitParticle(new THREE.Vector3(shown.x, shown.y, shown.z).add(jitter), drift, 0.9 + Math.random() * 0.7, new THREE.Color(0.35, 0.9, 1.0));
+    }
+
+    const idx = Math.min(Math.floor(state.flight.t / (PHYS_CONST.DT * PHYS_CONST.REC_EVERY)) + 2, traj.pts.length);
+    pathLine.geo.setDrawRange(0, clamp(idx, 2, pathLine.maxPts));
+  } else if (state.traj) {
+    const s = sampleTraj(state.traj, Math.min(state.flight.t, state.traj.tTotal));
+    projectile.position.set(s.x, Math.max(s.y, 0.45), s.z);
+    shown = s;
+  }
+
+  if (shown) {
+    _origin.copy(projectile.position);
+    _dir.set(shown.vx, shown.vy, shown.vz);
+    const sp = _dir.length();
+    if (sp > 0.001) {
+      velArrow.visible = true;
+      velArrow.position.copy(_origin);
+      velArrow.setDirection(_dir.normalize());
+      velArrow.setLength(clamp(sp * 0.35, 0.6, 14), 0.9, 0.45);
+    } else velArrow.visible = false;
+    gravArrow.visible = true;
+    gravArrow.position.copy(_origin).y += 0.1;
+    gravArrow.setLength(clamp(p.g * 0.85, 0.6, 14), 0.9, 0.45);
+    $('hud-t').textContent = shown.t.toFixed(2);
+    $('hud-y').textContent = shown.y.toFixed(2);
+    $('hud-x').textContent = Math.sqrt(shown.x * shown.x + shown.z * shown.z).toFixed(2);
+    $('hud-v').textContent = shown.s.toFixed(2);
+  }
+
+  if (impactFx > 0) {
+    impactFx = Math.max(0, impactFx - dtReal * 0.7);
+    const e = 1 - impactFx;
+    impactRing.scale.setScalar(0.5 + e * 5);
+    impactRing.material.opacity = impactFx * 0.85;
+  }
+
+  updateParticles(dtReal);
+  controls.update();
+  renderer.render(scene, camera);
+  updateFPS(dtReal);
+}
+
+/* ─────────────────────────── INIT ─────────────────────────── */
+
+loadHistory();
+syncPhysicsUI();
+syncBarrel();
+updateGravityChips();
+previewTraj();
+renderHistory();
+switchTab('physics');
+runMc(0xA9E15F27 >>> 0);
+resizeRenderer();
+animate();
+
+</script>
+</body>
+</html>
